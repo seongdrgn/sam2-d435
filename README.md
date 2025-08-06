@@ -5,7 +5,7 @@ Parts of this implementation are based on [SAM2 Real-time](https://github.com/Gy
 ## Demos
 <div align=center>
 <p align="center">
-<img src="./docs/demo.gif" width="880">
+<img src="./docs/demo.gif" width="600">
 </p>
 </div>
 

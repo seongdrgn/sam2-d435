@@ -1,78 +1,97 @@
-# segment-anything-2 real-time
-Run Segment Anything Model 2 on a **live video stream**
-
-## News
-- 13/12/2024 : Update to sam2.1
-- 20/08/2024 : Fix management of ```non_cond_frame_outputs``` for better performance and add bbox prompt
+# Deploy Segment Anything Model 2.0 (SAM2) to Intel RealSense D435
 
 ## Demos
 <div align=center>
 <p align="center">
 <img src="./assets/blackswan.gif" width="880">
 </p>
-
 </div>
 
+## Getting Started with SAM 2
 
+### SAM2 installation
 
-## Getting Started
+Please refer to [the installation guide](https://github.com/facebookresearch/sam2/tree/main) provided in the official repository for detailed setup instructions.
 
-### Installation
+### Prepare Intel Realsense SDK python
 
-```bash
-pip install -e .
-```
-### Download Checkpoint
+The Intel RealSense SDK for Python can be installed via [pyrealsense2](https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/readme.md), the official Python package available on PyPI.
 
-Then, we need to download a model checkpoint.
-
-```bash
-cd checkpoints
-./download_ckpts.sh
-```
-
-Then SAM-2-online can be used in a few lines as follows for image and video and **camera** prediction.
-
-### Camera prediction
+### Stream real-time segmentation with Intel Realsense Camera
 
 ```python
 import torch
 from sam2.build_sam import build_sam2_camera_predictor
 
-sam2_checkpoint = "../checkpoints/sam2.1_hiera_small.pt"
-model_cfg = "configs/sam2.1/sam2.1_hiera_s.yaml"
-predictor = build_sam2_camera_predictor(model_cfg, checkpoint)
+sam2_checkpoint = "checkpoints/sam2.1_hiera_tiny.pt"
+model_cfg = "configs/sam2.1/sam2.1_hiera_t.yaml"
+predictor = build_sam2_camera_predictor(model_cfg, sam2_checkpoint)
 
-cap = cv2.VideoCapture(<your video or camera >)
+import pyrealsense2 as rs
+import numpy as np
+import cv2
+import time
+
+# Configure depth and color streams
+pipeline = rs.pipeline()
+config = rs.config()
+
+# Get device product line for setting a supporting resolution
+pipeline_wrapper = rs.pipeline_wrapper(pipeline)
+pipeline_profile = config.resolve(pipeline_wrapper)
+device = pipeline_profile.get_device()
+device_product_line = str(device.get_info(rs.camera_info.product_line))
+
+found_rgb = False
+for s in device.sensors:
+    if s.get_info(rs.camera_info.name) == 'RGB Camera':
+        found_rgb = True
+        break
+if not found_rgb:
+    print("The demo requires Depth camera with Color sensor")
+    exit(0)
+
+config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)
+
+# Start streaming
+pipeline.start(config)
 
 if_init = False
 
+prev_time = 0
+current_time = 0
+
 with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        width, height = frame.shape[:2][::-1]
+        current_time = time.time()
+        fps = 1 / (current_time - prev_time)
+        prev_time = current_time
+
+        frames = pipeline.wait_for_frames()
+        frame = frames.get_color_frame()
+        color_frame = np.asanyarray(frame.get_data())
+
+        width, height = color_frame.shape[:2][::-1]
 
         if not if_init:
-            predictor.load_first_frame(frame)
+            predictor.load_first_frame(color_frame)
             if_init = True
-            _, out_obj_ids, out_mask_logits = predictor.add_new_prompt(<your promot >)
 
-        else:
-            out_obj_ids, out_mask_logits = predictor.track(frame)
+            ann_frame_idx = 0  # the frame index we interact with
+
+            # First annotation
+            ann_obj_id = 1  # give a unique id to each object we interact with (it can be any integers)
+            ##! add points, `1` means positive click and `0` means negative click
+            points = np.array([[350, 350]], dtype=np.float32)
+            labels = np.array([1], dtype=np.int32)
+
+            _, out_obj_ids, out_mask_logits = predictor.add_new_prompt(
+                frame_idx=ann_frame_idx, obj_id=ann_obj_id, points=points, labels=labels
+            )
             ...
 ```
-
-### With model compilation
-
-You can use the `vos_inference` argument in the `build_sam2_camera_predictor` function to enable model compilation. The inference may be slow for the first few execution as the model gets warmed up, but should result in significant inference speed improvement. 
-
-We provide the modified config file `sam2/configs/sam2.1/sam2.1_hiera_t_512.yaml`, with the modifications necessary to run SAM2 at a 512x512 resolution. Notably the parameters that need to be changed are highlighted in the config file at lines 24, 43, 54 and 89.
-
-We provide the file `sam2/benchmark.py` to test the speed gain from using the model compilation.
 
 ## References:
 
 - SAM2 Repository: https://github.com/facebookresearch/sam2
-# sam2-d435
+- Real-time sam2 Repository: 

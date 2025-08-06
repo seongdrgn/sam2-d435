@@ -3,7 +3,7 @@
 ## Demos
 <div align=center>
 <p align="center">
-<img src="./assets/blackswan.gif" width="880">
+<img src="./docs/demo.gif" width="880">
 </p>
 </div>
 

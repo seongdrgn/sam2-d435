@@ -94,4 +94,4 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
 ## References:
 
 - SAM2 Repository: https://github.com/facebookresearch/sam2
-- Real-time sam2 Repository: 
+- Real-time sam2 Repository: https://github.com/Gy920/segment-anything-2-real-time

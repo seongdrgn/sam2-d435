@@ -1,5 +1,7 @@
 # Deploy Segment Anything Model 2.0 (SAM2) to Intel RealSense D435
 
+Parts of this implementation are based on [SAM2 Real-time](https://github.com/Gy920/segment-anything-2-real-time).
+
 ## Demos
 <div align=center>
 <p align="center">
